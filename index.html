@@ -1,0 +1,181 @@
+
+<!-- and how to live my site to everyone with i have only my mongo and github i have no other domain -->
+
+<!-- create a complete solution that properly connects your frontend to your backend with Socket.IO for real-time multiplayer functionality:
+
+html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meme War - Welcome</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #1a1a1a, #2c3e50);
+      color: white;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    .lobby-animation {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #1a1a1a, #2c3e50);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+    }
+
+    .animated-meme {
+      max-width: 300px;
+      border-radius: 15px;
+      box-shadow: 0 0 30px rgba(255, 204, 0, 0.5);
+      animation: expand 2s ease-in-out, slowMotion 4s ease-in-out 2s infinite;
+    }
+
+    @keyframes expand { 
+      0% { transform: scale(0.1); opacity: 0; } 
+      50% { transform: scale(1.2); opacity: 1; } 
+      100% { transform: scale(1); } 
+    }
+    
+    @keyframes slowMotion { 
+      0%, 100% { transform: scale(1); } 
+      50% { transform: scale(1.05); } 
+    }
+
+    .welcome-text {
+      font-size: 3.5rem;
+      font-weight: bold;
+      background: linear-gradient(45deg, #ff6b6b, #ffcc00, #00cec9);
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 2rem 0 1rem 0;
+      opacity: 0;
+      animation: fadeIn 1s ease-in-out 2s forwards, pulse 2s infinite 3s;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    .welcome-subtitle { 
+      font-size: 1.5rem; 
+      opacity: 0; 
+      animation: fadeIn 1s ease-in-out 3s forwards; 
+    }
+
+    .start-button {
+      padding: 15px 40px;
+      background: linear-gradient(45deg, #00b894, #00cec9);
+      border: none;
+      border-radius: 50px;
+      color: white;
+      font-size: 1.2rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      opacity: 0;
+      animation: fadeIn 1s ease-in-out 4s forwards;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      margin-top: 2rem;
+    }
+
+    .start-button:hover { 
+      transform: translateY(-3px); 
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); 
+    }
+
+    .sound-control {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .sound-control i { 
+      font-size: 1.5rem; 
+      color: white; 
+    }
+  </style>
+</head>
+<body>
+  <div class="lobby-animation" id="lobbyAnimation">
+    <img src="https://media.tenor.com/h4agW955SCsAAAAM/hakloda-shah-rukh-khan-meme.gif" alt="Shahrukh Khan Meme" class="animated-meme" />
+    <h1 class="welcome-text">Hey Memer!</h1>
+    <p class="welcome-subtitle">Welcome to Meme War Arena</p>
+    <button class="start-button" id="getStartedBtn" onclick="redirectToLobby()">Get Started <i class="fas fa-arrow-right"></i></button>
+  </div>
+
+  <div class="sound-control" onclick="toggleSound()">
+    <i class="fas fa-volume-up" id="soundIcon"></i>
+  </div>
+
+  <audio id="shahrukhSound" preload="auto">
+    <source src="https://www.myinstants.com/media/sounds/shah-rukh-khan.mp3" type="audio/mpeg" />
+  </audio>
+
+  <script>
+    // Play sound on page load
+    window.addEventListener('load', function() {
+      playSound();
+    });
+    
+    function playSound() {
+      const sound = document.getElementById('shahrukhSound');
+      sound.volume = 0.7;
+      // Called from a user gesture so browsers will allow it
+      sound.play().catch(e => console.log('Audio play failed:', e));
+    }
+
+    function toggleSound() {
+      const sound = document.getElementById('shahrukhSound');
+      const soundIcon = document.getElementById('soundIcon');
+      
+      if (sound.volume > 0) {
+        sound.volume = 0;
+        soundIcon.className = 'fas fa-volume-mute';
+      } else {
+        sound.volume = 0.7;
+        soundIcon.className = 'fas fa-volume-up';
+      }
+    }
+
+    function redirectToLobby() {
+      window.location.href = '/lobby';
+    }
+  </script>
+</body>
+</html>

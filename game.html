@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Meme War Arena — Play</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root{
+      --bg:#0c1116; --card:#12171d; --accent:#ffcc00; --accent2:#00cec9; --muted:#9aa4ad; --glass: rgba(255,255,255,0.04);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      min-height:100vh;background:linear-gradient(180deg,#071018,#0f1720);font-family:Inter,system-ui,Segoe UI,Roboto,Arial;color:#e9eef3;
+      display:flex;align-items:center;justify-content:center;padding:24px;
+    }
+    .app{width:100%;max-width:1100px}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .brand .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#ff9966);display:flex;align-items:center;justify-content:center;font-weight:900;color:#111}
+    .title{font-size:20px;font-weight:800}
+    .roomInfo{color:var(--muted);font-size:14px}
+
+    .panel{background:var(--card);border-radius:14px;padding:18px;border:1px solid var(--glass);box-shadow:0 20px 50px rgba(0,0,0,.6)}
+    .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .round{font-weight:800}
+    .timer{font-size:20px;color:var(--accent2);font-weight:700}
+    .phase{color:var(--muted);font-size:14px}
+
+    .players{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .playerTag{background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:999px;font-size:13px;color:var(--muted)}
+
+    .main{display:grid;grid-template-columns:1fr 360px;gap:18px}
+    @media(max-width:980px){.main{grid-template-columns:1fr}}
+
+    .memeCard{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:10px}
+    .memeImg{width:100%;max-height:520px;border-radius:10px;object-fit:contain;background:#0a0f13}
+    .captionInput{width:100%;padding:12px;border-radius:10px;border:none;background:rgba(255,255,255,0.03);color:inherit;font-size:15px}
+    .btn{padding:10px 14px;border-radius:10px;border:none;background:linear-gradient(45deg,var(--accent2),#00b894);color:#052;cursor:pointer;font-weight:800}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+
+    .right{display:flex;flex-direction:column;gap:12px}
+    .box{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px}
+    .voteGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .voteCard{background:#0d1317;border-radius:10px;padding:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.03);transition:transform .14s,box-shadow .14s}
+    .voteCard:hover{transform:translateY(-6px);box-shadow:0 16px 40px rgba(0,0,0,.6)}
+    .voteCard img{width:100%;height:160px;object-fit:cover;border-radius:8px}
+
+    .scoreBoard{display:flex;flex-direction:column;gap:8px}
+    .scoreItem{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
+    .winner{background:linear-gradient(90deg,var(--accent),#ffaa44);color:#111;font-weight:900;padding:8px;border-radius:8px}
+
+    .overlay{position:fixed;inset:0;background:rgba(2,6,10,0.75);display:none;align-items:center;justify-content:center;z-index:60}
+    .overlayBox{background:var(--card);padding:20px;border-radius:12px;max-width:720px;width:95%}
+    .muted{color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="panel top">
+      <div class="brand">
+        <div class="logo">MW</div>
+        <div>
+          <div class="title">Meme War Arena</div>
+          <div class="roomInfo" id="roomInfo">Room: —</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div id="roundLabel" class="round">Waiting</div>
+        <div id="timerLabel" class="timer">--</div>
+        <div id="phaseLabel" class="phase">Not started</div>
+      </div>
+    </header>
+
+    <div class="panel main">
+      <!-- LEFT: Meme & caption -->
+      <div>
+        <div class="memeCard">
+          <div class="players" id="playersList"></div>
+
+          <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+            <div id="memeWrap" style="width:100%;display:flex;align-items:center;justify-content:center;min-height:320px;">
+              <img id="memeImg" class="memeImg" src="" alt="Round Meme" style="display:none"/>
+            </div>
+
+            <input id="captionInput" class="captionInput" placeholder="Write a caption (will be submitted to vote)..." />
+            <div style="display:flex;gap:10px;justify-content:flex-end">
+              <button id="submitBtn" class="btn">Submit Meme</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="statusMessage" style="margin-top:12px;color:var(--accent);font-weight:700"></div>
+      </div>
+
+      <!-- RIGHT: Voting & scoreboard -->
+      <div class="right">
+        <div class="box">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <strong>Voting</strong>
+            <span id="voteTimer" class="muted">--</span>
+          </div>
+          <div id="voteGrid" class="voteGrid" style="min-height:120px">
+            <!-- vote cards -->
+          </div>
+        </div>
+
+        <div class="box scoreBoard">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <strong>Scoreboard</strong>
+            <span class="muted">+25 per round</span>
+          </div>
+          <div id="scoresList" style="margin-top:8px"></div>
+        </div>
+
+        <div class="box">
+          <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+            <div class="muted">Host controls</div>
+            <div>
+              <button id="startBtn" class="btn">Start Game</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- overlay for round results / final -->
+  <div id="overlay" class="overlay">
+    <div class="overlayBox" id="overlayBox"></div>
+  </div>
+
+  <script>
+    const socket = io();
+    const params = new URLSearchParams(window.location.search);
+    const roomId = params.get('roomId') || 'default';
+    const username = params.get('username') || 'You';
+
+    // UI refs
+    const roomInfo = document.getElementById('roomInfo');
+    const playersList = document.getElementById('playersList');
+    const memeImg = document.getElementById('memeImg');
+    const captionInput = document.getElementById('captionInput');
+    const submitBtn = document.getElementById('submitBtn');
+    const statusMessage = document.getElementById('statusMessage');
+    const roundLabel = document.getElementById('roundLabel');
+    const timerLabel = document.getElementById('timerLabel');
+    const phaseLabel = document.getElementById('phaseLabel');
+    const voteGrid = document.getElementById('voteGrid');
+    const voteTimer = document.getElementById('voteTimer');
+    const scoresList = document.getElementById('scoresList');
+    const overlay = document.getElementById('overlay');
+    const overlayBox = document.getElementById('overlayBox');
+    const startBtn = document.getElementById('startBtn');
+
+    let hasSubmitted = false;
+    let hasVoted = false;
+    let currentRound = 0;
+    let players = [];
+    let localIsHost = false;
+    let currentMemes = {}; // playerId -> meme object
+
+    roomInfo.textContent = `Room: ${roomId}`;
+
+    // join
+    socket.emit('joinRoom', { roomId, playerName: username });
+
+    // host control
+    startBtn.addEventListener('click', () => {
+      if (!localIsHost) return;
+      socket.emit('startGame', { roomId });
+      startBtn.disabled = true;
+    });
+
+    // update players
+    socket.on('roomUpdate', (playersArr) => {
+      players = playersArr;
+      renderPlayers(playersArr);
+      updateScores(playersArr);
+      statusMessage.textContent = `Players in room: ${playersArr.length}`;
+      // if you are host (server sent hostAssigned), it will enable start button
+    });
+
+    socket.on('hostAssigned', () => {
+      localIsHost = true;
+      startBtn.disabled = false;
+      statusMessage.textContent = 'You are host — press Start Game';
+    });
+
+    // gameWillStart (optional)
+    socket.on('gameWillStart', ({ rounds }) => {
+      statusMessage.textContent = `Game starting — ${rounds} rounds`;
+      overlay.style.display = 'none';
+    });
+
+    // gameStarted = create phase for round
+    socket.on('gameStarted', ({ round, maxRounds, meme, timer }) => {
+      currentRound = round;
+      currentMemes = {};
+      hasSubmitted = false;
+      hasVoted = false;
+      phaseLabel.textContent = 'Create (caption)';
+      roundLabel.textContent = `Round ${round} of ${maxRounds}`;
+      timerLabel.textContent = `${timer}s`;
+      voteTimer.textContent = '--';
+      voteGrid.innerHTML = '';
+      scoreSnapshot = null;
+
+      // show meme (shared)
+      memeImg.src = meme.url;
+      memeImg.style.display = 'block';
+      captionInput.disabled = false;
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit Meme';
+      statusMessage.textContent = 'Write your caption and Submit (or auto-submit when time ends)';
+
+      // start local countdown display — server is authoritative but we show seconds for UX
+      let sec = timer;
+      const tick = setInterval(() => {
+        sec--;
+        timerLabel.textContent = `${Math.max(sec,0)}s`;
+        if (sec <= 0) clearInterval(tick);
+      }, 1000);
+    });
+
+    // timer update from server (authoritative)
+    socket.on('timerUpdate', (sec) => {
+      timerLabel.textContent = `${sec}s`;
+    });
+
+    // when a player submits their meme (server emitted memeAdded)
+    socket.on('memeAdded', ({ playerId, meme }) => {
+      // keep current mems to show in voting stage later
+      currentMemes[playerId] = meme;
+      statusMessage.textContent = `${Object.keys(currentMemes).length} / ${players.length} submitted`;
+    });
+
+    // voting started: server sends all memes (map playerId->meme) and players list
+    socket.on('votingStarted', ({ memes, players: serverPlayers, duration }) => {
+      phaseLabel.textContent = 'Voting';
+      voteTimer.textContent = `${duration}s`;
+      voteGrid.innerHTML = '';
+      statusMessage.textContent = 'Vote the best meme now!';
+
+      // ensure we show all memes (server ensured auto-submits for missing)
+      currentMemes = memes;
+
+      // populate vote cards
+      const entries = Object.entries(memes);
+      // create a stable ordering: serverPlayers order
+      for (const p of serverPlayers) {
+        const pid = p.id;
+        const m = memes[pid];
+        if (!m) continue;
+        const card = document.createElement('div');
+        card.className = 'voteCard';
+        card.id = `card-${pid}`;
+        card.innerHTML = `
+          <img src="${m.url}" alt="mem" onerror="this.style.display='none'">
+          <div style="padding-top:8px"><strong>${p.name}</strong></div>
+          <div style="color:var(--muted);font-size:13px;margin-top:6px">${m.caption ? `"${m.caption}"` : ''}</div>
+          <div id="votes-${pid}" style="margin-top:8px;color:var(--accent)">0 votes</div>
+        `;
+        card.addEventListener('click', () => {
+          if (hasVoted) return;
+          socket.emit('submitVote', { roomId, votedPlayerId: pid });
+          hasVoted = true;
+          card.style.outline = '3px solid rgba(0,200,150,0.25)';
+          // visually disable other cards
+          document.querySelectorAll('.voteCard').forEach(c => c.style.pointerEvents = 'none');
+        });
+        voteGrid.appendChild(card);
+      }
+    });
+
+    // voting timer updates
+    socket.on('votingTimerUpdate', (sec) => {
+      voteTimer.textContent = `${sec}s`;
+    });
+
+    // live vote count updates
+    socket.on('voteUpdate', (votes) => {
+      for (const [pid, count] of Object.entries(votes || {})) {
+        const el = document.getElementById(`votes-${pid}`);
+        if (el) el.textContent = `${count} vote${count !== 1 ? 's' : ''}`;
+      }
+    });
+
+    // votingEnded -> show round winner and scoreboard
+    socket.on('votingEnded', ({ votes, winner, winnerMeme, scores, nextRound }) => {
+      // show overlay with winner + scoreboard
+      overlay.style.display = 'flex';
+      overlayBox.innerHTML = `
+        <div style="text-align:center">
+          <h2 style="margin-bottom:6px">${winner ? `${winner.name} wins this round!` : "No winner"}</h2>
+          ${winnerMeme ? `<img src="${winnerMeme.url}" style="max-width:100%;border-radius:8px;max-height:260px;object-fit:cover"/>` : ''}
+          <div style="margin-top:12px">
+            <strong>Round Scores</strong>
+            <div style="margin-top:10px">${scores.map(s => `<div style="display:flex;justify-content:space-between;padding:6px 0">${s.name}<span>${s.score}</span></div>`).join('')}</div>
+          </div>
+          ${nextRound ? `<div style="margin-top:12px;color:var(--muted)">Next round starts in 5s...</div>` : `<div style="margin-top:12px;color:var(--muted)">Finalizing game...</div>`}
+        </div>
+      `;
+      // update local scoreboard UI
+      updateScores(scores);
+
+      // overlay auto-hide after 5s when nextRound true; otherwise wait for gameEnded
+      if (nextRound) {
+        setTimeout(() => {
+          overlay.style.display = 'none';
+        }, 5000);
+      }
+    });
+
+    // game ended: show final winner and full scoreboard
+    socket.on('gameEnded', ({ scores, overallWinner }) => {
+      overlay.style.display = 'flex';
+      overlayBox.innerHTML = `
+        <div style="text-align:center">
+          <h1 style="margin-bottom:6px">Game Over</h1>
+          <h2 style="margin-bottom:12px">${overallWinner ? `${overallWinner.name} is the champion!` : "It's a tie!"}</h2>
+          <div style="margin-top:6px"><strong>Final Scores</strong></div>
+          <div style="margin-top:10px">${scores.map(s => `<div style="display:flex;justify-content:space-between;padding:6px 0">${s.name}<span>${s.score}</span></div>`).join('')}</div>
+          <div style="margin-top:12px">
+            <button class="btn" onclick="location.href='/'">Back to Home</button>
+          </div>
+        </div>
+      `;
+      updateScores(scores);
+    });
+
+    // reconnect handling
+    socket.on('connect', () => {
+      socket.emit('joinRoom', { roomId, playerName: username });
+    });
+
+    // submit caption (player's meme submission)
+    submitBtn.addEventListener('click', () => {
+      if (hasSubmitted) return;
+      const caption = captionInput.value.trim();
+      if (!caption) {
+        statusMessage.textContent = "Please add a caption (or wait, it will auto-submit)"; 
+        return;
+      }
+      // submit to server; server will attach shared meme url
+      socket.emit('memeGenerated', { roomId, meme: { caption } });
+      hasSubmitted = true;
+      captionInput.disabled = true;
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Submitted";
+      statusMessage.textContent = "Submitted — waiting for voting phase";
+    });
+
+    // helper: render players
+    function renderPlayers(pl) {
+      playersList.innerHTML = '';
+      pl.forEach(p => {
+        const el = document.createElement('div');
+        el.className = 'playerTag';
+        el.textContent = `${p.name} ${p.id === socket.id ? '(You)' : ''}`;
+        playersList.appendChild(el);
+      });
+    }
+
+    // helper: update scoreboard panel
+    function updateScores(scoresArr) {
+      // scoresArr could be players objects or array of {id,name,score}
+      const arr = scoresArr.map(s => ({ id: s.id, name: s.name, score: s.score || 0 }));
+      scoresList.innerHTML = '';
+      arr.forEach(s => {
+        const el = document.createElement('div');
+        el.className = 'scoreItem';
+        el.innerHTML = `<div>${s.name}</div><div>${s.score}</div>`;
+        scoresList.appendChild(el);
+      });
+    }
+  </script>
+</body>
+</html>
