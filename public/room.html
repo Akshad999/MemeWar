@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meme War - Room</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #1a1a1a, #2c3e50);
+      color: white;
+      min-height: 100vh;
+    }
+
+    .room-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    
+    .logo {
+      font-size: 3rem;
+      color: #ffcc00;
+      margin-bottom: 1rem;
+    }
+    
+    .title {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    .room-info {
+      background: rgba(255,255,255,0.1);
+      padding: 1.5rem;
+      border-radius: 15px;
+      margin-bottom: 2rem;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .room-code {
+      font-size: 1.5rem;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+    
+    .copy-btn {
+      padding: 8px 15px;
+      background: rgba(255,255,255,0.2);
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+    }
+    
+    .players-list {
+      background: rgba(255,255,255,0.1);
+      padding: 2rem;
+      border-radius: 15px;
+      margin-bottom: 2rem;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .player-item {
+      padding: 1rem;
+      margin: 0.5rem 0;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .host-badge {
+      background: #ffcc00;
+      color: #000;
+      padding: 0.3rem 0.8rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+    
+    .you-badge {
+      background: #00b894;
+      color: white;
+      padding: 0.3rem 0.8rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+    
+    .start-btn {
+      padding: 15px 30px;
+      background: linear-gradient(45deg, #00b894, #00cec9);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 1.2rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: block;
+      margin: 0 auto;
+    }
+    
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    
+    .start-btn:disabled {
+      background: #636e72;
+      cursor: not-allowed;
+    }
+    
+    .copyright {
+      text-align: center;
+      margin-top: 3rem;
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+    
+    .sound-control {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .sound-control i { 
+      font-size: 1.5rem; 
+      color: white; 
+    }
+  </style>
+</head>
+<body>
+  <div class="room-container">
+    <div class="header">
+      <div class="logo">😂</div>
+      <h1 class="title">Meme War Room</h1>
+      <p>Share the room code with your friends to play together</p>
+    </div>
+    
+    <div class="room-info">
+      <div>
+        <div>Room Code:</div>
+        <div class="room-code" id="roomCodeDisplay">Loading...</div>
+      </div>
+      <button class="copy-btn" onclick="copyRoomCode()">
+        <i class="fas fa-copy"></i> Copy
+      </button>
+    </div>
+    
+    <div class="players-list">
+      <h2><i class="fas fa-users"></i> Players in Room</h2>
+      <div id="playersContainer">
+        <p>Loading players...</p>
+      </div>
+    </div>
+    
+    <button class="start-btn" id="startGameBtn" onclick="startGame()" disabled>Start Game</button>
+    
+    <div class="copyright">
+      © 2025 Akshad. All rights reserved.
+    </div>
+  </div>
+
+  <div class="sound-control" onclick="toggleSound()">
+    <i class="fas fa-volume-up" id="soundIcon"></i>
+  </div>
+
+  <audio id="shahrukhSound" preload="auto">
+    <source src="https://www.myinstants.com/media/sounds/shah-rukh-khan.mp3" type="audio/mpeg" />
+  </audio>
+
+  <script>
+    const socket = io();
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('roomId');
+    const username = urlParams.get('username');
+    
+    let isHost = false;
+    
+    // Play sound on page load
+    window.addEventListener('load', function() {
+      playSound();
+    });
+    
+    // Display room code
+    document.getElementById('roomCodeDisplay').textContent = roomId;
+    
+    // Join the room
+    socket.emit('joinRoom', { roomId, playerName: username });
+    
+    // Socket event listeners
+    socket.on('roomUpdate', (players) => {
+      updatePlayersList(players);
+    });
+    
+    socket.on('hostAssigned', () => {
+      isHost = true;
+      document.getElementById('startGameBtn').disabled = false;
+    });
+    
+    socket.on('gameStarted', () => {
+      window.location.href = `/play?roomId=${roomId}&username=${username}`;
+    });
+    
+    function playSound() {
+      const sound = document.getElementById('shahrukhSound');
+      sound.volume = 0.7;
+      // Called from a user gesture so browsers will allow it
+      sound.play().catch(e => console.log('Audio play failed:', e));
+    }
+
+    function toggleSound() {
+      const sound = document.getElementById('shahrukhSound');
+      const soundIcon = document.getElementById('soundIcon');
+      
+      if (sound.volume > 0) {
+        sound.volume = 0;
+        soundIcon.className = 'fas fa-volume-mute';
+      } else {
+        sound.volume = 0.7;
+        soundIcon.className = 'fas fa-volume-up';
+      }
+    }
+    
+    function updatePlayersList(players) {
+      const playersContainer = document.getElementById('playersContainer');
+      playersContainer.innerHTML = '';
+      
+      if (players.length === 0) {
+        playersContainer.innerHTML = '<p>No players yet.</p>';
+        return;
+      }
+      
+      players.forEach(player => {
+        const playerElement = document.createElement('div');
+        playerElement.className = 'player-item';
+        
+        let badges = '';
+        if (player.id === socket.id) {
+          badges += '<span class="you-badge">YOU</span> ';
+        }
+        if (isHost && player.id === socket.id) {
+          badges += '<span class="host-badge">HOST</span>';
+        }
+        
+        playerElement.innerHTML = `
+          <span>${player.name}</span>
+          <div>${badges}</div>
+        `;
+        
+        playersContainer.appendChild(playerElement);
+      });
+    }
+    
+    function copyRoomCode() {
+      navigator.clipboard.writeText(roomId)
+        .then(() => {
+          alert('Room code copied to clipboard!');
+        })
+        .catch(err => {
+          console.error('Failed to copy: ', err);
+        });
+    }
+    
+    function startGame() {
+      if (!isHost) return;
+      
+      socket.emit('startGame', { roomId });
+    }
+  </script>
+</body>
+</html>
